@@ -20,8 +20,8 @@ MATH_BEGIN = [u'\\(', u'\\[']
 MATH_END = [u'\\)', u'\\]']
 
 escape_list = [u' ', u'#', u'$', u'%', u'^', u'&', u'(', u')', u'[', u']', u'{', u'}']
-fun_parameter_map = {u'\\frac': 2, u'\\sqrt': 2, u'_': 1}
-
+func_parameter_map = {u' \\frac': 2, u' \\sqrt': 2, u'^': 1}
+annihilate_map = {u'_': 1}
 fractions = [u'\\dfrac', u'\\sfrac', u'\\cfrac', u'\\frac']
 
 
@@ -38,16 +38,28 @@ class ItemFormulae(Formula):
         for key in self.item_keys:
             k_code = self.item_k_code.get(key)
             char_list = char_list_generate(k_code)
-            expr = normalize_latex(char_list)
-            result[key] = expr[8:].split('[[math]]')
+            math = normalize_latex(char_list)
+            result[key] = math[8:].split('[[math]]')
         self.math = result
+        self.maths = self.math['ans'] + self.math['exp'] + self.math['desc']
 
     def set_vars_value(self):
         for key in self.var_patterns.keys():
             pattern = re.compile(self.var_patterns[key])
-            for string in self.math['ans'] + self.math['exp'] + self.math['desc']:
+            for string in self.maths:
                 cnt = len(re.findall(pattern, string))
                 self.vars_value[key] += cnt
+
+    def set_exprs_value(self):
+        for key in self.expr_patterns.keys():
+            for pat in self.expr_patterns[key]:
+                for string in self.maths:
+                    pattern = re.compile(pat)
+                    cnt = len(re.findall(pattern, string))
+                    if cnt:
+                        print '===', string, key, cnt
+                        print pat
+                    self.exprs_value[key] += cnt
 
 
 def normalize_k_code(char):
@@ -89,13 +101,15 @@ def character_estimate(latex_str):
         if not cmd:
             if a == '\\':
                 cmd = COMMAND
+            elif a.isalpha():
+                yield mode, ' ' + a # 输出非控制序列的字符
             elif a != ' ':
-                yield mode, a # 输出非控制序列的字符
+                yield mode, a
         else:
             if a.isalpha():
                 char_buffer += a
                 if not b.isalpha():
-                    char, char_buffer, cmd = char_buffer, '\\', UNCOMMAND
+                    char, char_buffer, cmd = ' ' + char_buffer, '\\', UNCOMMAND
                     yield mode, char
             else:  # 直接转义的 LaTeX 符号
                 cmd = UNCOMMAND
@@ -130,27 +144,37 @@ def normalize_latex(char_list, ini_level=0, idx=0, par_buffer=str()):
     length = len(char_list)
     expr = str()
     par_num = 0
+    anni_num = 0
     for i in xrange(idx, length):
         char, level= char_list[i].get('char'), char_list[i].get('level')
         if char_list[i]['used']:
             continue
         if level == ini_level:
-            if char in fun_parameter_map.keys():
-                par_num += fun_parameter_map[char]
+            if char in func_parameter_map.keys():
+                par_num += func_parameter_map[char]
                 expr += char
+            elif char in annihilate_map.keys():
+                anni_num += annihilate_map[char]
             else:
-                if par_num == 0:
-                    expr += char
-                else:
-                    expr += normalize_parameter(char)
-                    par_num += -1
+                if anni_num == 0:
+                    if par_num == 0:
+                        expr += char
+                    else:
+                        expr += normalize_parameter(char)
+                        par_num += -1
+                else:  # 处理吞掉的字符
+                    anni_num += -1
             char_list[i]['used'] = USED
         elif level > ini_level:
-            if par_num == 0:
-                expr += normalize_latex(char_list, level, i, par_buffer)
+            if anni_num == 0:
+                if par_num == 0:
+                    expr += normalize_latex(char_list, level, i, par_buffer)
+                else:
+                    expr += normalize_parameter(normalize_latex(char_list, level, i, par_buffer))
+                    par_num += -1
             else:
-                expr += normalize_parameter(normalize_latex(char_list, level, i, par_buffer))
-                par_num += -1
+                normalize_latex(char_list, level, i, par_buffer)
+                anni_num += -1
         else:
             expr += char
             char_list[i]['used'] = USED

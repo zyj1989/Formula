@@ -19,7 +19,7 @@ def get_item_k_code(item_id):
             k_code['desc'] += q['desc']
             if 'ans' in q:
                 for ans in q['ans']:
-                    k_code['ans'] += ans
+                    k_code['ans'] += str(ans)
             if 'exp' in q:
                 k_code['exp'] += q['exp']
         return k_code
