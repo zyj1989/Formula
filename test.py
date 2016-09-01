@@ -7,7 +7,7 @@ from itemformulae import char_list_generate
 
 
 def main():
-    formula = ItemFormulae('57845a70def29763faade783')
+    formula = ItemFormulae('55e00c7f5417d1142a1b57eb')
     formula.transfer_k_code()
     print formula.math
     formula.set_exprs_value()

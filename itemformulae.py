@@ -21,7 +21,7 @@ MATH_END = [u'\\)', u'\\]']
 
 escape_list = [u' ', u'#', u'$', u'%', u'^', u'&', u'(', u')', u'[', u']', u'{', u'}']
 func_parameter_map = {u' \\frac': 2, u' \\sqrt': 2, u'^': 1}
-annihilate_map = {u'_': 1}
+annihilate_map = {u'_': 1, u' \\begin': 1, u' \\end': 1}
 fractions = [u'\\dfrac', u'\\sfrac', u'\\cfrac', u'\\frac']
 
 
@@ -52,12 +52,13 @@ class ItemFormulae(Formula):
 
     def set_exprs_value(self):
         for key in self.expr_patterns.keys():
-            for pat in self.expr_patterns[key]:
-                for string in self.maths:
+            for string in self.maths:
+                for pat in self.expr_patterns[key]:
                     pattern = re.compile(pat)
                     cnt = len(re.findall(pattern, string))
                     if cnt:
-                        print '===', string, key, cnt
+                        print '===', string
+                        print key, cnt
                         print pat
                     self.exprs_value[key] += cnt
 
@@ -71,11 +72,11 @@ def normalize_k_code(char):
     char = char.replace(ur'\left{', ur'\{')
     char = char.replace(ur'\left', ur'')
     char = char.replace(ur'\right', ur'')
-    char = char.replace(ur'\style{font-family:Times New Roman}{g}', u' ')
+    char = char.replace(ur'\style{font-family:Times New Roman}{g}', u'g')
     return char
 
 
-def normalize_parameter(par):
+def normalize_parameter(par):  # 参数状态下, 添加 LaTeX 省略的括号{}
     if par == '':
         return par
     else:
@@ -83,6 +84,17 @@ def normalize_parameter(par):
             result = par
         else:
             result = u'{' + par + u'}'
+        return result
+
+
+def normalize_unparameter(par):  # 非参数状态下, 去除多余的{}
+    if par == '':
+        return par
+    else:
+        if par[0] in [u'[', u'{'] and par[-1] in [u']', u'}']:
+            result = par[1:-1]
+        else:
+            result = par
         return result
 
 
@@ -102,7 +114,7 @@ def character_estimate(latex_str):
             if a == '\\':
                 cmd = COMMAND
             elif a.isalpha():
-                yield mode, ' ' + a # 输出非控制序列的字符
+                yield mode, ' ' + a  # 输出非控制序列的字符
             elif a != ' ':
                 yield mode, a
         else:
@@ -124,6 +136,8 @@ def character_estimate(latex_str):
 
 
 def char_list_generate(k_code):
+    # k_code = re.sub(ur'\{\{[^\{\}]*\}\}', lambda x: x.group(0)[1:-1], k_code)  # 去掉重复多余的{}
+    k_code = k_code.replace(ur'&', ur' ')  # 去掉公式中的对齐符号, 同时会将'\&'替换成'\ ', 待优化
     char_list = []
     level = int()
     k_code = normalize_k_code(k_code)
@@ -168,7 +182,7 @@ def normalize_latex(char_list, ini_level=0, idx=0, par_buffer=str()):
         elif level > ini_level:
             if anni_num == 0:
                 if par_num == 0:
-                    expr += normalize_latex(char_list, level, i, par_buffer)
+                    expr += normalize_unparameter(normalize_latex(char_list, level, i, par_buffer))
                 else:
                     expr += normalize_parameter(normalize_latex(char_list, level, i, par_buffer))
                     par_num += -1

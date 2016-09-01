@@ -12,6 +12,7 @@ db = client['physics']
 
 def get_item_k_code(item_id):
 
+
     def _deal_with_qs(qs, k_code):
         for q in qs:
             if 'qs' in q:
@@ -19,10 +20,11 @@ def get_item_k_code(item_id):
             k_code['desc'] += q['desc']
             if 'ans' in q:
                 for ans in q['ans']:
-                    k_code['ans'] += str(ans)
+                    k_code['ans'] += u'{}'.format(ans)
             if 'exp' in q:
                 k_code['exp'] += q['exp']
         return k_code
+
 
     item = db.item.find_one({'_id': ObjectId(item_id)})
     k_code = {'desc': item['data']['stem'], 'ans': '', 'exp': ''}
