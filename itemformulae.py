@@ -2,6 +2,7 @@
 # -*- coding:utf-8 -*-
 
 from mongodb import get_item_k_code
+from mongodb import write_in_db
 from formula import Formula
 import re
 
@@ -28,10 +29,12 @@ fractions = [u'\\dfrac', u'\\sfrac', u'\\cfrac', u'\\frac']
 class ItemFormulae(Formula):
     def __init__(self, item_id):
         Formula.__init__(self)
+        self.item_id = item_id
         self.item_keys = {'desc', 'ans', 'exp'}
         self.item_k_code = get_item_k_code(item_id)
         self.math = {}
         self.ltx_str = ''
+        self.relation = []
 
     def transfer_k_code(self):
         result = dict()
@@ -39,7 +42,14 @@ class ItemFormulae(Formula):
             k_code = self.item_k_code.get(key)
             char_list = char_list_generate(k_code)
             math = normalize_latex(char_list)
+            # print math
+            math = re.sub(ur' \\frac\{1\}\{2\}', ur' \\frac{\\one}{\\two}', math)
+            math = re.sub(ur' \\frac\{\d+\}\{\d+\}', ur'', math)
+            math = re.sub(ur' \\sqrt\[(\d+)\]\{(\d+)\}', ur'', math)
+            math = re.sub(ur' \\frac\{\\one\}\{\\two\}', ur' \\frac{1}{2}', math)
+            # print math
             result[key] = math[8:].split('[[math]]')
+
         self.math = result
         self.maths = self.math['ans'] + self.math['exp'] + self.math['desc']
 
@@ -60,7 +70,11 @@ class ItemFormulae(Formula):
                         print '===', string
                         print key, cnt
                         print pat
+                        self.relation.append({'key': key, 'string': string, 'cnt': cnt, 'pat': pat})
                     self.exprs_value[key] += cnt
+    def write(self):
+        write_in_db(self.item_id, self.math, self.vars_value, self.exprs_value, self.relation)
+
 
 
 def normalize_k_code(char):
@@ -73,6 +87,8 @@ def normalize_k_code(char):
     char = char.replace(ur'\left', ur'')
     char = char.replace(ur'\right', ur'')
     char = char.replace(ur'\style{font-family:Times New Roman}{g}', u'g')
+    char = char.replace(ur'\mathrm', u'')
+    # char = char.replace(ur"'", u'')
     return char
 
 
